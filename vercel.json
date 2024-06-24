@@ -1,0 +1,16 @@
+{
+	"$schema": "https://openapi.vercel.sh/vercel.json",
+	"outputDirectory": "dist",
+	"redirects": [
+		{
+			"source": "/robots.txt",
+			"destination": "/api/robots",
+			"statusCode": 301
+		},
+		{
+			"source": "/ai.txt",
+			"destination": "/api/ai",
+			"statusCode": 301
+		}
+	]
+}
