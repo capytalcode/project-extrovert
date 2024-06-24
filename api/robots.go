@@ -19,7 +19,10 @@ func RobotsTxt(w http.ResponseWriter, r *http.Request) {
 	if error("Error trying to read ai block list", err, http.StatusInternalServerError) {
 		return
 	}
-	w.Write(bytes)
+	_, err = w.Write(bytes)
+	if error("Error trying to write ai block list", err, http.StatusInternalServerError) {
+		return
+	}
 
 	w.Header().Add("Cache-Control", "max-age=604800, stale-while-revalidate=86400, stale-if-error=86400")
 	w.Header().Add("CDN-Cache-Control", "max-age=604800")
