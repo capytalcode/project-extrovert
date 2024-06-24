@@ -23,7 +23,7 @@ dev/server:
 
 dev/sync_assets:
 	go run github.com/air-verse/air@v1.52.2 \
-		--build.cmd "templ generate --notify-proxy" \
+		--build.cmd "go run github.com/a-h/templ/cmd/templ@v0.2.707 generate --notify-proxy" \
 		--build.bin "true" \
 		--build.delay "100" \
 		--build.exclude_dir "" \
