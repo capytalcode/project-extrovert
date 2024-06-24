@@ -6,6 +6,64 @@ import (
 
 templ Index() {
 	@layouts.Page("013") {
-		<h1>Hello, world</h1>
+		<style>
+			@media(min-width: 640px) {
+				article {
+					max-width: 50%;
+				}
+			}
+			aritcle {
+				max-width: 100%;
+			}
+		</style>
+		<main class="container-fluid" style="display:flex;justify-content:center;align-content:center;">
+			<article>
+				<header>
+					<nav>
+						<ul>
+							<li>Project Extrovert</li>
+						</ul>
+						<ul>
+							<li>
+								<a
+									class="secondary"
+									target="_blank"
+									href="https://github.com/capytalcode/project-extrovert"
+									rel="noreferer nofollow"
+								>GitHub</a>
+							</li>
+							<li>
+								<a
+									class="secondary"
+									target="_blank"
+									href="https://codeberg.org/capytalcode/project-extrovert"
+									rel="noreferer nofollow"
+								>Codeberg</a>
+							</li>
+						</ul>
+					</nav>
+				</header>
+				This is a project by
+				<a
+					target="_blank"
+					href="https://github.com/capytalcode"
+					rel="noreferer nofollow"
+				>
+					Capytal Code
+				</a>,
+				keep visting this link to see the project's evoluition and development.
+				<footer>
+					&copy; 2024
+					<a
+						href="https://guz.one"
+						target="_blank"
+						rel="noreferer nofollow"
+						class="secondary"
+					>
+						Gustavo L. de Mello
+					</a>
+				</footer>
+			</article>
+		</main>
 	}
 }
