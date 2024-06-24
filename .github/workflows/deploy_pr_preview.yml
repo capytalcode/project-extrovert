@@ -33,6 +33,7 @@ jobs:
       - name: Deploy
         uses: BetaHuhn/deploy-to-vercel-action@v1
         with:
+          GITHUB_DEPLOYMENT: false
           GITHUB_TOKEN: ${{ SECRETS.GITHUB_TOKEN }}
           VERCEL_TOKEN: ${{ SECRETS.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ SECRETS.VERCEL_ORG_ID }}
