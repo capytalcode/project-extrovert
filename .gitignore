@@ -4,6 +4,7 @@ Session.vim
 .vercel
 *_templ.go
 *_templ.txt
+.env
 dist
 tmp
 bin

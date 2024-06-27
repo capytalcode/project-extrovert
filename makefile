@@ -34,7 +34,8 @@ dev/sync_assets:
 		--build.include_ext "js,css"
 
 dev:
-	make -j3 dev/templ dev/server dev/sync_assets
+	go run github.com/joho/godotenv/cmd/godotenv@v1.5.1 \
+		make -j3 dev/templ dev/server dev/sync_assets
 
 run: build
 	./bin/www
@@ -45,7 +46,6 @@ clean:
 	if [[ -d "dist" ]]; then rm -r ./dist; fi
 	if [[ -d "tmp" ]]; then rm -r ./tmp; fi
 	if [[ -d "bin" ]]; then rm -r ./bin; fi
-	rm ./static/uno.css
 	rm $(TEMPL_FILES)
 
 # For some reason "templ generate" does not detect the files in CI,

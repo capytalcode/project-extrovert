@@ -1,0 +1,23 @@
+package components
+
+import (
+	"fmt"
+	"os"
+	"net/url"
+)
+
+var loginUrl = fmt.Sprintf("https://x.com/i/oauth2/authorize"+
+	"?response_type=code"+
+	"&client_id=%s"+
+	"&redirect_uri=%s"+
+	"&scope=tweet.write tweet.read users.read"+
+	"&state=state"+
+	"&code_challenge=challenge"+
+	"&code_challenge_method=plain",
+	os.Getenv("TWITTER_CLIENT_ID"),
+	url.PathEscape("http://localhost:7331/api/oauth/twitter"),
+)
+
+templ LoginTwitter() {
+	<a href={ templ.SafeURL(loginUrl) } rel="">Login on Twitter</a>
+}

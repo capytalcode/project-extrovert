@@ -1,8 +1,31 @@
 package internals
 
 import (
+	"fmt"
 	"net/http"
+	"slices"
 )
+
+func GetCookie(name string, w http.ResponseWriter, r *http.Request) *http.Cookie {
+	name = fmt.Sprintf("__Host-%s-%s-%s", APP_NAME, APP_VERSION, name)
+
+	c := r.Cookies()
+	i := slices.IndexFunc(c, func(c *http.Cookie) bool {
+		return c.Name == name
+	})
+	var cookie *http.Cookie
+	if i == -1 {
+		cookie = &http.Cookie{
+			Name:     name,
+			SameSite: http.SameSiteStrictMode,
+			Path:     "/",
+			Secure:   true,
+		}
+	} else {
+		cookie = c[i]
+	}
+	return cookie
+}
 
 func HttpErrorHelper(w http.ResponseWriter) func(msg string, err error, status int) bool {
 	return func(msg string, err error, status int) bool {

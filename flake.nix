@@ -2,8 +2,9 @@
   description = "learning.rs";
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
+    templ.url = "github:a-h/templ?ref=v0.2.707";
   };
-  outputs = { nixpkgs, ... }:
+  outputs = { nixpkgs, ... } @ inputs:
     let
       systems = [
         "x86_64-linux"
@@ -16,6 +17,7 @@
           pkgs = import nixpkgs { inherit system; };
         in
         f system pkgs);
+      templ = system: inputs.templ.packages.${system}.templ;
     in
     {
       devShells = forAllSystems (system: pkgs: {
@@ -23,6 +25,7 @@
           buildInputs = with pkgs; [
             go
             golangci-lint
+            (templ system)
           ];
         };
       });

@@ -13,6 +13,13 @@ var ROUTES = []Route{
 		Page:    IndexPage(),
 		Handler: IndexHandler,
 	},
+	{
+		Pattern: "/api/oauth/twitter",
+		Static:  false,
+		Page:    TwitterLogin(),
+		Handler: TwitterLoginHandler,
+	},
+}
 
 type RouteHandler = func(http.ResponseWriter, *http.Request)
 
