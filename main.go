@@ -7,7 +7,7 @@ import (
 	"net/http"
 
 	"extrovert/internals"
-	"extrovert/pages"
+	"extrovert/routes"
 )
 
 var logger = log.Default()
@@ -26,7 +26,7 @@ func main() {
 
 	mux := http.NewServeMux()
 
-	pages.RegisterAllRoutes(pages.ROUTES, mux)
+	routes.RegisterAllRoutes(routes.ROUTES, mux)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/" {
 			logger.Printf("Handling file server request. path=%s", r.URL.Path)
