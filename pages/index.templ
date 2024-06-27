@@ -1,69 +1,53 @@
 package pages
 
 import (
+	"net/http"
+
 	"extrovert/layouts"
+	"extrovert/components"
+	"extrovert/internals"
 )
 
-templ Index() {
-	@layouts.Page("013") {
-		<style>
-			@media(min-width: 640px) {
-				article {
-					max-width: 50%;
-				}
-			}
-			aritcle {
-				max-width: 100%;
-			}
-		</style>
-		<main class="container-fluid" style="display:flex;justify-content:center;align-content:center;">
-			<article>
-				<header>
-					<nav>
-						<ul>
-							<li>Project Extrovert</li>
-						</ul>
-						<ul>
-							<li>
-								<a
-									class="secondary"
-									target="_blank"
-									href="https://github.com/capytalcode/project-extrovert"
-									rel="noreferer nofollow"
-								>GitHub</a>
-							</li>
-							<li>
-								<a
-									class="secondary"
-									target="_blank"
-									href="https://codeberg.org/capytalcode/project-extrovert"
-									rel="noreferer nofollow"
-								>Codeberg</a>
-							</li>
-						</ul>
-					</nav>
-				</header>
-				This is a project by
-				<a
-					target="_blank"
-					href="https://github.com/capytalcode"
-					rel="noreferer nofollow"
+func IndexHandler(w http.ResponseWriter, r *http.Request) {
+	_ = internals.GetCookie("twitter-data", w, r)
+
+	IndexPage().Render(context.TODO(), w)
+}
+
+templ IndexPage() {
+	@layouts.Page("Project Extrovert") {
+		<div style="max-width:50rem;">
+			<div style="display:flex;flex-direction:column;gap:1rem;">
+				<main
+					style="height:15rem"
 				>
-					Capytal Code
-				</a>,
-				keep visting this link to see the project's evoluition and development.
-				<footer>
-					&copy; 2024
-					<a
-						href="https://guz.one"
-						target="_blank"
-						rel="noreferer nofollow"
-						class="secondary"
+					<form
+						style="height:100%;display:flex;gap:2rem;"
 					>
-						Gustavo L. de Mello
-					</a>
+						<fieldset style="display:flex;flex-direction:column;gap:1rem;width:15rem;">
+							@components.LoginTwitter()
+							<button>Login on Mastodon</button>
+						</fieldset>
+						<fieldset>
+							<textarea
+								style="height:100%;resize:none;"
+								name="post"
+								placeholder="Write a post..."
+								aria-label="Post input"
+							></textarea>
+						</fieldset>
+					</form>
+				</main>
+				<footer>
+					@components.Warning("In Development") {
+						<strong>
+							This application is in active development and should not be used in production.
+						</strong>
+						Expect bugs, lost data, logouts, etc. Use it at your own risk.
+						This software is provided "as is", without any warranty of any kind.
+					}
 				</footer>
-			</article>
-		</main>
+			</div>
+		</div>
 	}
 }

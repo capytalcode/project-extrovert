@@ -15,9 +15,13 @@ templ Page(title string) {
 				rel="stylesheet"
 				href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css"
 			/>
+			<link
+				rel="stylesheet"
+				href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.colors.min.css"
+			/>
 			<title>{ title }</title>
 		</head>
-		<body>
+		<body style="display:flex;justify-content:center;align-items:center;width:100vw;height:100vh;">
 			{ children... }
 		</body>
 	</html>
