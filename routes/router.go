@@ -19,6 +19,18 @@ var ROUTES = []Route{
 		Page:    TwitterLogin(),
 		Handler: TwitterLoginHandler,
 	},
+	{
+		Pattern: "/robots.txt",
+		Static:  true,
+		Page:    RobotsTxt(),
+		Handler: RobotsTxtHandler,
+	},
+	{
+		Pattern: "/ai.txt",
+		Static:  true,
+		Page:    AiTxt(),
+		Handler: AiTxtHandler,
+	},
 }
 
 type RouteHandler = func(http.ResponseWriter, *http.Request)
