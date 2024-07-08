@@ -1,15 +1,15 @@
 name: Deploy preview to Vercel
 
-on:
-  pull_request:
-    branches:
-      - main
-      - dev
-    types:
-      - opened
-      - synchronize
-      - reopened
-
+# on:
+#   pull_request:
+#     branches:
+#       - main
+#       - dev
+#     types:
+#       - opened
+#       - synchronize
+#       - reopened
+#
 jobs:
   deploy:
     name: Deploy
