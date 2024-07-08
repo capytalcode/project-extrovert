@@ -6,6 +6,18 @@ import (
 	"slices"
 )
 
+func RemoveDuplicates[T comparable](slice []T) []T {
+	keys := make(map[T]bool)
+	list := []T{}
+	for _, entry := range slice {
+		if _, value := keys[entry]; !value {
+			keys[entry] = true
+			list = append(list, entry)
+		}
+	}
+	return list
+}
+
 func GetCookie(name string, w http.ResponseWriter, r *http.Request) *http.Cookie {
 	name = fmt.Sprintf("__Host-%s-%s-%s", APP_NAME, APP_VERSION, name)
 

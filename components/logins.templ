@@ -21,3 +21,32 @@ var loginUrl = fmt.Sprintf("https://x.com/i/oauth2/authorize"+
 templ LoginTwitter() {
 	<a href={ templ.SafeURL(loginUrl) } rel="">Login on Twitter</a>
 }
+
+templ LoginMastodon() {
+	<button popovertargetaction="show" popovertarget="mastodon-login">Login on Mastodon</button>
+	<div id="mastodon-login" popover>
+		<dialog open>
+			<article>
+				<header>
+					<button
+						popovertargetaction="hide"
+						popovertarget="mastodon-login"
+						aria-label="Close"
+						rel="prev"
+					></button>
+					<label for="instance-url">Choose a instance</label>
+				</header>
+				<input
+					type="url"
+					name="instance-url"
+					placeholder="Instance Url"
+					aria-label="Instance Url"
+					list="instance-suggestions"
+				/>
+				<datalist id="instance-suggestions">
+					@InstancesOptions(20)
+				</datalist>
+			</article>
+		</dialog>
+	</div>
+}

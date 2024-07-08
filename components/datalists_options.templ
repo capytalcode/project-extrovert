@@ -1,0 +1,97 @@
+package components
+
+import (
+	"os"
+	"net/url"
+	"net/http"
+	"encoding/json"
+	"log"
+	"slices"
+	"extrovert/internals"
+	"fmt"
+	"errors"
+)
+
+type Instance struct {
+	Name string `json:"name"`
+}
+
+func fetchInstanceList(limit int) ([]Instance, error) {
+
+	u, err := url.ParseRequestURI("https://instances.social/api/1.0/instances/list")
+	if err != nil {
+		return []Instance{}, err
+	}
+
+	u.Query().Add("min_version", "0.1.0")
+	u.Query().Add("sort_by", "active_users")
+	u.Query().Add("count", fmt.Sprintf("%v", limit))
+	u.Query().Add("prohibted_content", "nudity_nocw")
+	u.Query().Add("prohibted_content", "pornography_nocw")
+	u.Query().Add("prohibted_content", "illegalContentLinks")
+	u.Query().Add("prohibted_content", "spam")
+	u.Query().Add("prohibted_content", "advertising")
+
+	req, err := http.NewRequest(http.MethodGet, u.String(), bytes.NewReader([]byte("")))
+	if err != nil {
+		return []Instance{}, err
+	}
+	req.Header.Add("Authorization", "Bearer "+os.Getenv("INSTANCES_SOCIAL_TOKEN"))
+
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return []Instance{}, err
+	}
+
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return []Instance{}, err
+	} else if res.StatusCode != 200 {
+		return []Instance{}, errors.New(string(body))
+	}
+
+	var list struct {
+		Instances []Instance `json:"instances"`
+	}
+	err = json.Unmarshal(body, &list)
+
+	return list.Instances, err
+}
+
+var INSTANCES = []Instance{
+	/*
+		These servers are not endorsed, curated or affiliated by Capytal in any way, shape
+		or form. All the instances where got from the top 15 listed in https://joinmastodon.org/servers,
+		at July 8th, 2024 (2024-07-08).
+	*/
+	{Name: "mastodon.social"},
+	{Name: "mstdn.social"},
+	{Name: "mas.to"},
+	{Name: "social.vivaldi.net"},
+	{Name: "mastodonapp.uk"},
+	{Name: "universeodon.com"},
+	{Name: "c.im"},
+	{Name: "mstdn.party"},
+	{Name: "toot.community"},
+	{Name: "ohai.social"},
+	{Name: "mstdn.business"},
+	{Name: "ieji.de"},
+	{Name: "toot.io"},
+	{Name: "masto.nu"},
+	{Name: "mstdn.plus"},
+}
+
+func getInstanceList(limit int) []Instance {
+	i, err := fetchInstanceList(limit)
+	if err != nil {
+		log.Printf("WARN: Unable to fetch Mastodon instance datalist due to:\n%s\n\nFall backing into static list.", err.Error())
+		return INSTANCES
+	}
+	return internals.RemoveDuplicates(slices.Concat(INSTANCES, i))
+}
+
+templ InstancesOptions(limit int) {
+	for _, v := range getInstanceList(limit) {
+		<option value={ v.Name }></option>
+	}
+}

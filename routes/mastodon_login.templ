@@ -1,0 +1,98 @@
+package routes
+
+import (
+	"net/http"
+	"fmt"
+	"encoding/json"
+	"errors"
+	"os"
+
+	"extrovert/layouts"
+	"extrovert/internals"
+	"log"
+)
+
+type MastodonTokenResponse struct {
+	Type    string `json:"token_type"`
+	Token   string `json:"access_token"`
+	Expires int    `json:"expires_in"`
+	Scope   string `json:"scope"`
+}
+
+func MastodonLoginHandler(w http.ResponseWriter, r *http.Request) {
+	error := internals.HttpErrorHelper(w)
+
+	code := r.URL.Query().Get("code")
+	if code == "" {
+		error(
+			"Bad request",
+			errors.New("Missing \"code\" parameter"),
+			http.StatusBadRequest,
+		)
+		return
+	}
+
+	tReq := fmt.Sprintf("https://api.twitter.com/2/oauth2/token"+
+		"?grant_type=authorization_code"+
+		"&client_id=%s"+
+		"&code_verifier=challenge"+
+		"&code=%s"+
+		"&challenge_method=plain"+
+		"&redirect_uri=http://localhost:7331/api/oauth/twitter",
+		os.Getenv("TWITTER_CLIENT_ID"),
+		code,
+	)
+
+	t, err := http.Post(tReq, "application/x-www-form-urlencoded", bytes.NewReader([]byte("")))
+	if error("Error trying to request token from twitter", err, http.StatusInternalServerError) {
+		return
+	}
+
+	b, err := io.ReadAll(t.Body)
+	if error("Error trying to read response body from twitter", err, http.StatusInternalServerError) {
+		return
+	} else if t.StatusCode < 200 || t.StatusCode > 299 {
+		error(
+			"Error trying to request token from twitter, returned non-200 code",
+			errors.New(fmt.Sprintf("Code: %v, Return value: %s", t.StatusCode, string(b))),
+			http.StatusInternalServerError,
+		)
+		return
+	}
+
+	var res TwitterTokenResponse
+	err = json.Unmarshal(b, &res)
+	if error("Error trying to parse response body from twitter", err, http.StatusInternalServerError) {
+		return
+	}
+
+	log.Print(res)
+
+	c := internals.GetCookie("twitter-data", w, r)
+	c.Value = res.Token
+	http.SetCookie(w, c)
+
+	MastodonLogin().Render(context.Background(), w)
+}
+
+templ MastodonLogin() {
+	@layouts.Page("Project Extrovert") {
+		<dialog open>
+			<article>
+				<header>
+					<p>Logged into Twitter!</p>
+				</header>
+				<p>
+					Your account was succefully connected with project-extrovert!
+					Click "Ok" to return to the index page.
+				</p>
+				<footer>
+					<a href="/index.html">
+						<button>Ok</button>
+					</a>
+				</footer>
+			</article>
+		</dialog>
+		@IndexPage()
+	}
+}
