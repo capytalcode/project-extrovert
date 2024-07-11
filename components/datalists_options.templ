@@ -92,6 +92,6 @@ func getInstanceList(limit int) []Instance {
 
 templ InstancesOptions(limit int) {
 	for _, v := range getInstanceList(limit) {
-		<option value={ v.Name }></option>
+		<option value={ "https://" + v.Name } label={ v.Name }></option>
 	}
 }
