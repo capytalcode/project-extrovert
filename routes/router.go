@@ -20,6 +20,17 @@ var ROUTES = []Route{
 		Handler: TwitterOAuthHandler,
 	},
 	{
+		Pattern: "/api/mastodon/oauth",
+		Static:  false,
+		Page:    MastodonOAuth(),
+		Handler: MastodonOAuthHandler,
+	},
+	{
+		Pattern: "/api/mastodon/apps",
+		Static:  false,
+		Handler: MastodonAppHandler,
+	},
+	{
 		Pattern: "/robots.txt",
 		Static:  true,
 		Page:    RobotsTxt(),

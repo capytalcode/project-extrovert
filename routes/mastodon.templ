@@ -1,0 +1,278 @@
+package routes
+
+import (
+	"net/http"
+	"fmt"
+	"encoding/json"
+	"errors"
+	"net/url"
+
+	"extrovert/layouts"
+	"extrovert/internals"
+	"slices"
+	"strings"
+	"log"
+)
+
+const MASTODON_APP_NAME = "project-extrovert-v1"
+const MASTODON_COOKIE_NAME = "mastodon-cookie"
+const MASTODON_REDIRECT_URI = "http://localhost:7331/api/mastodon/oauth"
+const MASTODON_SCOPES = "read write"
+
+type MastodonApp struct {
+	Id           string  `json:"id"`
+	Name         string  `json:"name"`
+	Website      *string `json:"website"`
+	RedirectUri  string  `json:"redirect_uri"`
+	ClientId     string  `json:"client_id"`
+	ClientSecret string  `json:"client_secret"`
+	VapidKey     string  `json:"vapid_key"`
+}
+
+type MastodonTokenResponse struct {
+	Type     string `json:"token_type"`
+	Token    string `json:"access_token"`
+	CreateAt int    `json:"created_at"`
+	Scope    string `json:"scope"`
+}
+
+type MastodonCookie struct {
+	App      *MastodonApp           `json:"app"`
+	Token    *MastodonTokenResponse `json:"token"`
+	Instance *string                `json:"instance_url,string"`
+}
+
+func (a MastodonCookie) Validate() error {
+	u, err := url.Parse(*a.Instance)
+	if err != nil {
+		return err
+	}
+	u.Path = "/api/v1/apps/verify_credentials"
+
+	return nil
+}
+
+func NewMastodonApp(u url.URL) (MastodonApp, error) {
+	u.Path = "/api/v1/apps"
+	q := u.Query()
+	q.Add("client_name", MASTODON_APP_NAME)
+	q.Add("redirect_uris", MASTODON_REDIRECT_URI)
+	q.Add("scopes", MASTODON_SCOPES)
+	u.RawQuery = q.Encode()
+
+	res, err := http.Post(u.String(), "application/x-www-form-urlencoded", bytes.NewReader([]byte("")))
+	if err != nil {
+		return MastodonApp{}, err
+	}
+
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return MastodonApp{}, err
+	}
+
+	if res.StatusCode != 200 {
+		return MastodonApp{}, errors.New(string(body))
+	}
+
+	var app MastodonApp
+	err = json.Unmarshal(body, &app)
+
+	return app, err
+}
+
+func MastodonAppHandler(w http.ResponseWriter, r *http.Request) {
+	error := internals.HttpErrorHelper(w)
+
+	if r.Method != http.MethodPost {
+		error("Method not allowed", errors.New("method "+r.Method+" is not allowed"), http.StatusMethodNotAllowed)
+		return
+	}
+
+	i := r.URL.Query().Get("instance-url")
+	if i == "" {
+		i = r.FormValue("instance-url")
+		if i == "" {
+			error(
+				"Bad request",
+				errors.New("Missing \"instance-url\" parameter"),
+				http.StatusBadRequest,
+			)
+			return
+		}
+	}
+
+	u, err := url.Parse(i)
+	if error("Bad request\n\"instance-url\" is not a valid url", err, http.StatusBadRequest) {
+		return
+	}
+	if u.Scheme == "" {
+		u, err = url.Parse("https://" + u.String())
+		if error("Bad request\n\"instance-url\" is not a valid url", err, http.StatusBadRequest) {
+			return
+		}
+	}
+
+	rc, err := r.Cookie(MASTODON_COOKIE_NAME + "-" + u.Hostname())
+	if err != nil {
+		rc = &http.Cookie{
+			Name:   MASTODON_COOKIE_NAME + u.Hostname(),
+			Value:  fmt.Sprintf("{\"instance_url\": \"%s\"}", u.String()),
+			Path:   "/",
+			Secure: true,
+		}
+	}
+
+	var c MastodonCookie
+	err = json.Unmarshal([]byte(rc.Value), &c)
+	if err != nil {
+		_ = json.Unmarshal([]byte("{\"instance_url\": \"%s\"}"), c)
+	}
+
+	if c.Instance == nil {
+		str := u.String()
+		c.Instance = &str
+	}
+	if c.App == nil {
+		a, err := NewMastodonApp(*u)
+		c.App = &a
+		if error("Internal Error\nerror trying to create new Mastodon application", err, http.StatusInternalServerError) {
+			return
+		}
+	}
+
+	v, err := json.Marshal(c)
+	rc.Value = string(v)
+	http.SetCookie(w, rc)
+
+	log.Print(rc)
+
+	q := u.Query()
+	q.Add("response_type", "code")
+	q.Add("client_id", c.App.ClientId)
+	q.Add("redirect_uri", MASTODON_REDIRECT_URI)
+	q.Add("scope", MASTODON_SCOPES)
+	u.RawQuery = q.Encode()
+	u.Path = "/oauth/authorize"
+
+	MastodonAppPage(*u).Render(context.Background(), w)
+}
+
+templ MastodonAppPage(u url.URL) {
+	@layouts.Page("Project Extrovert") {
+		<dialog open>
+			<article>
+				<header>
+					<p>Mastodon app created!</p>
+				</header>
+				<p>
+					An app for your interactions was created on { u.Hostname() },
+					Click "Ok" to authorize your account.
+				</p>
+				<footer>
+					<a href={ templ.SafeURL(u.String()) }>
+						<button>Ok</button>
+					</a>
+				</footer>
+			</article>
+		</dialog>
+		@IndexPage()
+	}
+}
+
+func MastodonOAuthHandler(w http.ResponseWriter, r *http.Request) {
+	var err error
+	error := internals.HttpErrorHelper(w)
+
+	var rc *http.Cookie
+
+	o := r.Header.Get("Origin")
+	u, err := url.Parse(o)
+
+	if err == nil && o != "" {
+		rc, err = r.Cookie(MASTODON_COOKIE_NAME + "-" + u.Hostname())
+	}
+	if err != nil || o == "" {
+		i := slices.IndexFunc(r.Cookies(), func(c *http.Cookie) bool {
+			return strings.HasPrefix(c.Name, MASTODON_COOKIE_NAME+"-")
+		})
+		rc = r.Cookies()[i]
+	}
+
+	var c MastodonCookie
+	err = json.Unmarshal([]byte(rc.Value), &c)
+	if error("Bad Request", err, http.StatusBadRequest) {
+		return
+	}
+
+	code := r.URL.Query().Get("code")
+	if code == "" {
+		error(
+			"Bad request",
+			errors.New("Missing \"code\" parameter"),
+			http.StatusBadRequest,
+		)
+		return
+	}
+
+	u.Path = "/oauth/token"
+	q := u.Query()
+	q.Add("grant_type", "authorization_code")
+	q.Add("client_id", c.App.ClientId)
+	q.Add("client_secret", c.App.ClientSecret)
+	q.Add("redirect_uri", MASTODON_REDIRECT_URI)
+	q.Add("scope", MASTODON_SCOPES)
+	q.Add("code", code)
+	u.RawQuery = q.Encode()
+
+	t, err := http.Post(u.String(), "application/x-www-form-urlencoded", bytes.NewReader([]byte("")))
+	if error("Error trying to request token from twitter", err, http.StatusInternalServerError) {
+		return
+	}
+
+	b, err := io.ReadAll(t.Body)
+	if error("Error trying to read response body from twitter", err, http.StatusInternalServerError) {
+		return
+	} else if t.StatusCode < 200 || t.StatusCode > 299 {
+		error(
+			"Error trying to request token from twitter, returned non-200 code",
+			errors.New(fmt.Sprintf("Code: %v, Return value: %s", t.StatusCode, string(b))),
+			http.StatusInternalServerError,
+		)
+		return
+	}
+
+	var res MastodonTokenResponse
+	err = json.Unmarshal(b, &res)
+	if error("Error trying to parse response body from twitter", err, http.StatusInternalServerError) {
+		return
+	}
+	c.Token = &res
+
+	v, err := json.Marshal(c)
+	rc.Value = string(v)
+	http.SetCookie(w, rc)
+
+	MastodonOAuth().Render(context.Background(), w)
+}
+
+templ MastodonOAuth() {
+	@layouts.Page("Project Extrovert") {
+		<dialog open>
+			<article>
+				<header>
+					<p>Logged into Mastodon!</p>
+				</header>
+				<p>
+					Your account was succefully connected with project-extrovert!
+					Click "Ok" to return to the index page.
+				</p>
+				<footer>
+					<a href="/index.html">
+						<button>Ok</button>
+					</a>
+				</footer>
+			</article>
+		</dialog>
+		@IndexPage()
+	}
+}
