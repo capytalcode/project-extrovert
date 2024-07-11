@@ -14,10 +14,10 @@ var ROUTES = []Route{
 		Handler: IndexHandler,
 	},
 	{
-		Pattern: "/api/oauth/twitter",
+		Pattern: "/api/twitter/oauth",
 		Static:  false,
-		Page:    TwitterLogin(),
-		Handler: TwitterLoginHandler,
+		Page:    TwitterOAuth(),
+		Handler: TwitterOAuthHandler,
 	},
 	{
 		Pattern: "/robots.txt",

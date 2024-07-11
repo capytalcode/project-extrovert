@@ -18,7 +18,7 @@ type TwitterTokenResponse struct {
 	Scope   string `json:"scope"`
 }
 
-func TwitterLoginHandler(w http.ResponseWriter, r *http.Request) {
+func TwitterOAuthHandler(w http.ResponseWriter, r *http.Request) {
 	error := internals.HttpErrorHelper(w)
 
 	code := r.URL.Query().Get("code")
@@ -69,10 +69,10 @@ func TwitterLoginHandler(w http.ResponseWriter, r *http.Request) {
 	c.Value = res.Token
 	http.SetCookie(w, c)
 
-	TwitterLogin().Render(context.Background(), w)
+	TwitterOAuth().Render(context.Background(), w)
 }
 
-templ TwitterLogin() {
+templ TwitterOAuth() {
 	@layouts.Page("Project Extrovert") {
 		<dialog open>
 			<article>
