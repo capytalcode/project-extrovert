@@ -1,20 +1,11 @@
-package routes
+package pages
 
 import (
-	"net/http"
-
-	"extrovert/layouts"
+	"extrovert/templates/layouts"
 	"extrovert/components"
-	"extrovert/internals"
 )
 
-func IndexHandler(w http.ResponseWriter, r *http.Request) {
-	_ = internals.GetCookie("twitter-data", w, r)
-
-	IndexPage().Render(context.TODO(), w)
-}
-
-templ IndexPage() {
+templ Homepage() {
 	@layouts.Page("Project Extrovert") {
 		<div style="max-width:50rem;">
 			<div style="display:flex;flex-direction:column;gap:1rem;">

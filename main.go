@@ -26,7 +26,7 @@ func main() {
 
 	mux := http.NewServeMux()
 
-	routes.RegisterAllRoutes(routes.ROUTES, mux)
+	internals.RegisterAllRoutes(routes.ROUTES, mux)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/" {
 			logger.Printf("Handling file server request. path=%s", r.URL.Path)
