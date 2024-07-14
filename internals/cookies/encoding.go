@@ -2,6 +2,7 @@ package cookies
 
 import (
 	"errors"
+	"math/bits"
 	"net/http"
 	"reflect"
 	"strconv"
@@ -43,18 +44,23 @@ func Marshal[T any](c TypedCookie[T]) (http.Cookie, error) {
 		switch fv.Kind() {
 		case reflect.Bool:
 			value = strconv.FormatBool(fv.Bool())
+
 		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 			value = strconv.FormatInt(fv.Int(), 10)
+
 		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 			value = strconv.FormatUint(fv.Uint(), 10)
+
 		case reflect.Float32:
 			value = strconv.FormatFloat(fv.Float(), 'g', -1, 32)
 		case reflect.Float64:
 			value = strconv.FormatFloat(fv.Float(), 'g', -1, 64)
+
 		case reflect.Complex64:
 			value = strconv.FormatComplex(fv.Complex(), 'g', -1, 64)
 		case reflect.Complex128:
 			value = strconv.FormatComplex(fv.Complex(), 'g', -1, 128)
+
 		case reflect.String:
 			value = fv.String()
 		default:
@@ -138,11 +144,62 @@ func Unmarshal[T any](data http.Cookie, v *TypedCookie[T]) error {
 
 		value := m[tk]
 
+		var final any
+		var err error
 		switch fv.Kind() {
+		case reflect.Bool:
+			final, err = strconv.ParseBool(value)
+
+		case reflect.Int8:
+			final, err = strconv.ParseInt(value, 10, 8)
+		case reflect.Int16:
+			final, err = strconv.ParseInt(value, 10, 16)
+		case reflect.Int32:
+			final, err = strconv.ParseInt(value, 10, 32)
+		case reflect.Int64:
+			final, err = strconv.ParseInt(value, 10, 64)
+		case reflect.Int:
+			final, err = strconv.ParseInt(value, 10, bits.UintSize)
+
+		case reflect.Uint8:
+			final, err = strconv.ParseUint(value, 10, 8)
+		case reflect.Uint16:
+			final, err = strconv.ParseUint(value, 10, 16)
+		case reflect.Uint32:
+			final, err = strconv.ParseUint(value, 10, 32)
+		case reflect.Uint64:
+			final, err = strconv.ParseUint(value, 10, 64)
+		case reflect.Uint:
+			final, err = strconv.ParseUint(value, 10, bits.UintSize)
+
+		case reflect.Float32:
+			final, err = strconv.ParseFloat(value, 32)
+		case reflect.Float64:
+			final, err = strconv.ParseFloat(value, 64)
+
+		case reflect.Complex64:
+			final, err = strconv.ParseComplex(value, 64)
+		case reflect.Complex128:
+			final, err = strconv.ParseComplex(value, 128)
+
 		case reflect.String:
-			fv.Set(reflect.ValueOf(value))
+			final = value
 		default:
 			return errors.New("Unable to convert \"" + value + "\" to field \"" + f.Name + "\" kind \"" + fv.Kind().String() + "\"")
+		}
+
+		if err != nil {
+			return errors.New("Unable to convert \"" + value + "\" to field \"" + f.Name + "\" kind \"" + fv.Kind().String() + "\"")
+		}
+
+		if strings.Contains(strings.ToLower(fv.Kind().String()), "complex") {
+			fv.SetComplex(final.(complex128))
+		} else if strings.Contains(strings.ToLower(fv.Kind().String()), "uint") {
+			fv.SetUint(final.(uint64))
+		} else if strings.Contains(strings.ToLower(fv.Kind().String()), "int") {
+			fv.SetInt(final.(int64))
+		} else {
+			fv.Set(reflect.ValueOf(final))
 		}
 	}
 	return nil
