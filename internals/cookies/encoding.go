@@ -2,6 +2,7 @@ package cookies
 
 import (
 	e "errors"
+	"fmt"
 	"math/bits"
 	"net/http"
 	"reflect"
@@ -118,6 +119,12 @@ func Unmarshal[T any](data http.Cookie, v *TypedCookie[T]) error {
 
 func forEachField(v *reflect.Value, callback func(fv *reflect.Value, ft *reflect.StructField) error) (err error) {
 	t := v.Type()
+
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("Panic while trying to loop through fields. Error:\n%v", r)
+		}
+	}()
 
 	for i := 0; i < t.NumField(); i++ {
 		ft := t.Field(i)

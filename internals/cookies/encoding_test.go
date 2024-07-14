@@ -62,3 +62,15 @@ func TestUnmarshal(t *testing.T) {
 		t.Fatalf("Assertion failed, expected:\n%v\n\nfound:\n%v", TEST_VALUE, tc.TypedValue)
 	}
 }
+
+func TestPanicUnmarshal(t *testing.T) {
+	type Private struct {
+		//nolint:unused
+		privateField string `cookie:"private"`
+	}
+	var tc TypedCookie[Private]
+	err := Unmarshal(http.Cookie{Value: "private:Hello world"}, &tc)
+	if err == nil {
+		t.Fatalf("Function did not recover from panic, resulting value:\n%v", tc)
+	}
+}
