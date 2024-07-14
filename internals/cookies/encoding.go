@@ -39,33 +39,9 @@ func Marshal[T any](c TypedCookie[T]) (http.Cookie, error) {
 		}
 		tv := strings.Split(t, ",")
 
-		var value string
-
-		switch fv.Kind() {
-		case reflect.Bool:
-			value = strconv.FormatBool(fv.Bool())
-
-		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-			value = strconv.FormatInt(fv.Int(), 10)
-
-		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-			value = strconv.FormatUint(fv.Uint(), 10)
-
-		case reflect.Float32:
-			value = strconv.FormatFloat(fv.Float(), 'g', -1, 32)
-		case reflect.Float64:
-			value = strconv.FormatFloat(fv.Float(), 'g', -1, 64)
-
-		case reflect.Complex64:
-			value = strconv.FormatComplex(fv.Complex(), 'g', -1, 64)
-		case reflect.Complex128:
-			value = strconv.FormatComplex(fv.Complex(), 'g', -1, 128)
-
-		case reflect.String:
-			value = fv.String()
-		default:
-			return http.Cookie{},
-				errors.New("Unable to convert \"" + value + "\" to field \"" + f.Name + "\" kind \"" + fv.Kind().String() + "\"")
+		value, err := encodeString(fv)
+		if err != nil {
+			return http.Cookie{}, errors.Join(errors.New("Unsupportted type in struct: "+fv.Kind().String()), err)
 		}
 
 		v = append(v, tv[0]+":"+value)
@@ -142,54 +118,9 @@ func Unmarshal[T any](data http.Cookie, v *TypedCookie[T]) error {
 		}
 		tk := strings.Split(t, ",")[0]
 
-		value := m[tk]
-
-		var final any
-		var err error
-		switch fv.Kind() {
-		case reflect.Bool:
-			final, err = strconv.ParseBool(value)
-
-		case reflect.Int8:
-			final, err = strconv.ParseInt(value, 10, 8)
-		case reflect.Int16:
-			final, err = strconv.ParseInt(value, 10, 16)
-		case reflect.Int32:
-			final, err = strconv.ParseInt(value, 10, 32)
-		case reflect.Int64:
-			final, err = strconv.ParseInt(value, 10, 64)
-		case reflect.Int:
-			final, err = strconv.ParseInt(value, 10, bits.UintSize)
-
-		case reflect.Uint8:
-			final, err = strconv.ParseUint(value, 10, 8)
-		case reflect.Uint16:
-			final, err = strconv.ParseUint(value, 10, 16)
-		case reflect.Uint32:
-			final, err = strconv.ParseUint(value, 10, 32)
-		case reflect.Uint64:
-			final, err = strconv.ParseUint(value, 10, 64)
-		case reflect.Uint:
-			final, err = strconv.ParseUint(value, 10, bits.UintSize)
-
-		case reflect.Float32:
-			final, err = strconv.ParseFloat(value, 32)
-		case reflect.Float64:
-			final, err = strconv.ParseFloat(value, 64)
-
-		case reflect.Complex64:
-			final, err = strconv.ParseComplex(value, 64)
-		case reflect.Complex128:
-			final, err = strconv.ParseComplex(value, 128)
-
-		case reflect.String:
-			final = value
-		default:
-			return errors.New("Unable to convert \"" + value + "\" to field \"" + f.Name + "\" kind \"" + fv.Kind().String() + "\"")
-		}
-
+		final, err := decodeString(m[tk], fv.Kind())
 		if err != nil {
-			return errors.New("Unable to convert \"" + value + "\" to field \"" + f.Name + "\" kind \"" + fv.Kind().String() + "\"")
+			return errors.Join(errors.New("Unsupportted type in struct: "+fv.Kind().String()), err)
 		}
 
 		if strings.Contains(strings.ToLower(fv.Kind().String()), "complex") {
@@ -203,4 +134,83 @@ func Unmarshal[T any](data http.Cookie, v *TypedCookie[T]) error {
 		}
 	}
 	return nil
+}
+
+func encodeString(v reflect.Value) (string, error) {
+	switch v.Kind() {
+	case reflect.Bool:
+		return strconv.FormatBool(v.Bool()), nil
+
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return strconv.FormatInt(v.Int(), 10), nil
+
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return strconv.FormatUint(v.Uint(), 10), nil
+
+	case reflect.Float32:
+		return strconv.FormatFloat(v.Float(), 'g', -1, 32), nil
+	case reflect.Float64:
+		return strconv.FormatFloat(v.Float(), 'g', -1, 64), nil
+
+	case reflect.Complex64:
+		return strconv.FormatComplex(v.Complex(), 'g', -1, 64), nil
+	case reflect.Complex128:
+		return strconv.FormatComplex(v.Complex(), 'g', -1, 128), nil
+
+	case reflect.String:
+		return v.String(), nil
+
+	default:
+		return "", errors.ErrUnsupported
+	}
+}
+
+func decodeString(v string, k reflect.Kind) (any, error) {
+	var final any
+	var err error
+
+	switch k {
+	case reflect.Bool:
+		final, err = strconv.ParseBool(v)
+
+	case reflect.Int8:
+		final, err = strconv.ParseInt(v, 10, 8)
+	case reflect.Int16:
+		final, err = strconv.ParseInt(v, 10, 16)
+	case reflect.Int32:
+		final, err = strconv.ParseInt(v, 10, 32)
+	case reflect.Int64:
+		final, err = strconv.ParseInt(v, 10, 64)
+	case reflect.Int:
+		final, err = strconv.ParseInt(v, 10, bits.UintSize)
+
+	case reflect.Uint8:
+		final, err = strconv.ParseUint(v, 10, 8)
+	case reflect.Uint16:
+		final, err = strconv.ParseUint(v, 10, 16)
+	case reflect.Uint32:
+		final, err = strconv.ParseUint(v, 10, 32)
+	case reflect.Uint64:
+		final, err = strconv.ParseUint(v, 10, 64)
+	case reflect.Uint:
+		final, err = strconv.ParseUint(v, 10, bits.UintSize)
+
+	case reflect.Float32:
+		final, err = strconv.ParseFloat(v, 32)
+	case reflect.Float64:
+		final, err = strconv.ParseFloat(v, 64)
+
+	case reflect.Complex64:
+		final, err = strconv.ParseComplex(v, 64)
+	case reflect.Complex128:
+		final, err = strconv.ParseComplex(v, 128)
+
+	case reflect.String:
+		final = v
+
+	default:
+		return nil, errors.ErrUnsupported
+	}
+
+	return final, err
 }
