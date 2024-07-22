@@ -1,11 +1,19 @@
-package pages
+package routes
 
 import (
 	"extrovert/templates/layouts"
 	"extrovert/components"
+	"net/http"
 )
 
-templ Homepage() {
+type Homepage struct{}
+
+func (h Homepage) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusOK)
+	_ = h.page().Render(context.Background(), w)
+}
+
+templ (h Homepage) page() {
 	@layouts.Page("Project Extrovert") {
 		<div style="max-width:50rem;">
 			<div style="display:flex;flex-direction:column;gap:1rem;">

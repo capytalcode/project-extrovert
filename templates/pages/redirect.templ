@@ -21,6 +21,6 @@ templ RedirectPopUp(title string, msg string, url templ.SafeURL) {
 				</footer>
 			</article>
 		</dialog>
-		@Homepage()
+		{ children... }
 	}
 }
