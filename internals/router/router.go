@@ -1,6 +1,7 @@
 package router
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -43,7 +44,10 @@ func (router Router) wrapMiddleares(ms []Middleware, h http.HandlerFunc) http.Ha
 	return func(w http.ResponseWriter, r *http.Request) {
 		mw := NewMiddlewaredResponse(w)
 		fh(mw, r)
-		_, _ = mw.ReallyWriteHeader()
+		_, err := mw.ReallyWriteHeader()
+		if err != nil {
+			_, _ = w.Write([]byte(fmt.Sprintf("Error while trying to write to body:\n%s", err.Error())))
+		}
 	}
 }
 
