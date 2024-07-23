@@ -36,9 +36,12 @@ func handler(w http.ResponseWriter, r *http.Request) {
 }
 
 func TestRequest(t *testing.T) {
-	m := CookiesCryptoMiddleware{KEY}
+	m := NewCookiesCryptoMiddleware(KEY, log.Default())
 
-	e := m.encrypt(STRING)
+	e, err := m.encrypt(STRING)
+	if err != nil {
+		panic(err)
+	}
 
 	var COOKIE = http.Cookie{
 		Name:     "__Host-test",
@@ -71,7 +74,10 @@ func TestRequest(t *testing.T) {
 
 	log.Print(c)
 
-	d := m.decrypt(c.Value)
+	d, err := m.decrypt(c.Value)
+	if err != nil {
+		panic(err)
+	}
 
 	if d != STRING {
 		log.Fatalf(
@@ -82,13 +88,19 @@ func TestRequest(t *testing.T) {
 }
 
 func TestEncrypt(t *testing.T) {
-	m := CookiesCryptoMiddleware{KEY}
+	m := NewCookiesCryptoMiddleware(KEY, log.Default())
 
-	e := m.encrypt(STRING)
+	e, err := m.encrypt(STRING)
+	if err != nil {
+		panic(err)
+	}
 
 	log.Printf("Encrypted %s", e)
 
-	d := m.decrypt(e)
+	d, err := m.decrypt(e)
+	if err != nil {
+		panic(err)
+	}
 
 	log.Printf("Decrypted %s", d)
 
