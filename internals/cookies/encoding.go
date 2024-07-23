@@ -12,6 +12,7 @@ import (
 
 type TypedCookie[T any] struct {
 	http.Cookie
+	Name       string
 	TypedValue T
 }
 

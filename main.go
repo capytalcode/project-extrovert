@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 
 	"extrovert/internals/middlewares"
 	"extrovert/internals/router"
@@ -27,6 +28,7 @@ func main() {
 	if *dev {
 		r.AddMiddleware(middlewares.DevelopmentMiddleware{Logger: logger})
 	}
+	r.AddMiddleware(middlewares.CookiesCryptoMiddleware{os.Getenv("CRYPTO_COOKIES_KEY")})
 
 	err := http.ListenAndServe(fmt.Sprintf(":%v", *port), r)
 	if err != nil {
