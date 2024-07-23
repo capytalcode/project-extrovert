@@ -6,12 +6,16 @@ import (
 )
 
 type DevelopmentMiddleware struct {
-	Logger *log.Logger
+	logger *log.Logger
+}
+
+func NewDevelopmentMiddleware(logger *log.Logger) DevelopmentMiddleware {
+	return DevelopmentMiddleware{logger}
 }
 
 func (m DevelopmentMiddleware) Serve(handler http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		m.Logger.Printf("New request: %s", r.URL.Path)
+		m.logger.Printf("New request: %s", r.URL.Path)
 
 		handler(w, r)
 

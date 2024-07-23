@@ -26,9 +26,9 @@ func main() {
 
 	r := router.NewRouter(routes.ROUTES)
 	if *dev {
-		r.AddMiddleware(middlewares.DevelopmentMiddleware{Logger: logger})
+		r.AddMiddleware(middlewares.NewDevelopmentMiddleware(logger))
 	}
-	r.AddMiddleware(middlewares.CookiesCryptoMiddleware{os.Getenv("CRYPTO_COOKIES_KEY")})
+	r.AddMiddleware(middlewares.NewCookiesCryptoMiddleware(os.Getenv("CRYPTO_COOKIES_KEY"), logger))
 
 	err := http.ListenAndServe(fmt.Sprintf(":%v", *port), r)
 	if err != nil {
