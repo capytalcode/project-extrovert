@@ -14,6 +14,7 @@ import (
 
 type OAuthClient interface {
 	ServeHTTP(w http.ResponseWriter, r *http.Request)
+	Token(r *http.Request) (string, error)
 	LoginButton() templ.Component
 }
 
@@ -145,4 +146,24 @@ func (c DefaultOAuthClient) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
+}
+
+func (c DefaultOAuthClient) Token(r *http.Request) (string, error) {
+	cookie, err := r.Cookie("__Host-OAUTH-" + strings.ToUpper(c.Name))
+	if err != nil {
+		return "", e.Join(e.New("Unable get token cookie"), err)
+	}
+
+	j, err := url.PathUnescape(cookie.Value)
+	if err != nil {
+		return "", e.Join(e.New("Unable to unescape token json"), err)
+	}
+
+	var token DefaultOAuthToken
+	err = json.Unmarshal([]byte(j), &token)
+	if err != nil {
+		return "", e.Join(e.New("Unable to parse token json"), err)
+	}
+
+	return token.Token, nil
 }
