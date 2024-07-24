@@ -28,7 +28,7 @@ func main() {
 	if *dev {
 		r.AddMiddleware(middlewares.NewDevelopmentMiddleware(logger))
 	}
-	r.AddMiddleware(middlewares.NewCookiesCryptoMiddleware(os.Getenv("CRYPTO_COOKIES_KEY"), logger))
+	r.AddMiddleware(middlewares.NewCookiesCryptoMiddleware(os.Getenv("CRYPTO_COOKIE_KEY"), logger))
 
 	err := http.ListenAndServe(fmt.Sprintf(":%v", *port), r)
 	if err != nil {
