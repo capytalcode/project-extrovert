@@ -125,7 +125,7 @@ func (c DefaultOAuthClient) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	http.SetCookie(w, &http.Cookie{
 		Name:     "__Host-OAUTH-" + strings.ToUpper(c.Name),
-		Value:    string(cv),
+		Value:    url.PathEscape(string(cv)),
 		SameSite: http.SameSiteStrictMode,
 		Path:     "/",
 		Secure:   true,
