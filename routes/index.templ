@@ -4,13 +4,18 @@ import (
 	"extrovert/templates/layouts"
 	"extrovert/components"
 	"net/http"
+	"extrovert/internals/router/errors"
+	e "errors"
 )
 
 type Homepage struct{}
 
 func (h Homepage) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
-	_ = h.page().Render(context.Background(), w)
+	err := h.page().Render(context.Background(), w)
+	if err != nil {
+		errors.NewErrInternal(e.New("Unable to render dashboard"), err).ServeHTTP(w, r)
+	}
 }
 
 templ (h Homepage) page() {

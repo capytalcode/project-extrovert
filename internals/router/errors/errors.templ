@@ -1,0 +1,90 @@
+package errors
+
+import (
+	"net/http"
+	"strings"
+	"extrovert/templates/layouts"
+	"encoding/json"
+)
+
+type Error interface {
+	Error() string
+	Status() int
+	ServeHTTP(w http.ResponseWriter, r *http.Request)
+	Component() templ.Component
+	JSON() string
+}
+
+type defaultErr struct{}
+
+func (e defaultErr) Error() string {
+	return "Error: This method should have been overridden :')"
+}
+
+func (e defaultErr) Status() int {
+	return http.StatusNotImplemented
+}
+
+func (e defaultErr) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if strings.Contains(r.Header.Get("Accept"), "text/html") {
+		w.Header().Set("Content-Type", "text/html")
+
+		err := e.Component().Render(r.Context(), w)
+		if err != nil {
+			w.Header().Set("Content-Type", "text/plain")
+			w.Write([]byte("Unable to render error message, using JSON representation: " + e.JSON()))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+	} else {
+		w.Header().Set("Content-Type", "application/json")
+
+		_, err := w.Write([]byte(e.JSON()))
+		if err != nil {
+			w.Header().Set("Content-Type", "text/plain")
+			w.Write([]byte("Unable to send error information due to: " + err.Error()))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+	}
+	w.WriteHeader(e.Status())
+}
+
+func (e defaultErr) JSON() string {
+	type jsonErr struct {
+		Error string `json:"error"`
+		Info  any    `json:"info"`
+	}
+	js, err := json.Marshal(jsonErr{
+		Error: e.Error(),
+		Info:  e,
+	})
+	if err != nil {
+		js, _ = json.Marshal(jsonErr{
+			Error: "Unable to parse JSON of error",
+			Info:  err.Error(),
+		})
+	}
+
+	return string(js)
+}
+
+templ (e defaultErr) Component() {
+	@layouts.Page("Error") {
+		<dialog open>
+			<article>
+				<header>
+					<p>Error</p>
+				</header>
+				<p>
+					{ e.Error() }
+				</p>
+				<footer>
+					<a href={ templ.SafeURL("/") }>
+						<button>Return to homepage</button>
+					</a>
+				</footer>
+			</article>
+		</dialog>
+	}
+}
