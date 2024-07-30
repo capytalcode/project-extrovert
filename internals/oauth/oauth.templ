@@ -107,7 +107,7 @@ func (c DefaultOAuthClient) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		errors.NewErrInternal(fmt.Errorf(
 			"Unable to retrieve token, non-200 response from platform. \nStatus: %v\nBody: %s",
 			res.StatusCode, string(body)),
-		)
+		).ServeHTTP(w, r)
 		return
 	}
 
