@@ -7,25 +7,22 @@ import (
 	"encoding/json"
 )
 
-type Error interface {
+type RouteError interface {
 	Error() string
 	Status() int
+}
+
+type RouteErrorHandler interface {
 	ServeHTTP(w http.ResponseWriter, r *http.Request)
 	Component() templ.Component
 	JSON() string
 }
 
-type defaultErr struct{}
-
-func (e defaultErr) Error() string {
-	return "Error: This method should have been overridden :')"
+type defaultErrorHandler struct {
+	RouteError
 }
 
-func (e defaultErr) Status() int {
-	return http.StatusNotImplemented
-}
-
-func (e defaultErr) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (e defaultErrorHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if strings.Contains(r.Header.Get("Accept"), "text/html") {
 		w.Header().Set("Content-Type", "text/html")
 
@@ -50,7 +47,7 @@ func (e defaultErr) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(e.Status())
 }
 
-func (e defaultErr) JSON() string {
+func (e defaultErrorHandler) JSON() string {
 	type jsonErr struct {
 		Error string `json:"error"`
 		Info  any    `json:"info"`
@@ -69,7 +66,7 @@ func (e defaultErr) JSON() string {
 	return string(js)
 }
 
-templ (e defaultErr) Component() {
+templ (e defaultErrorHandler) Component() {
 	@layouts.Page("Error") {
 		<dialog open>
 			<article>
