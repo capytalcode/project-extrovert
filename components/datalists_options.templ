@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"log"
 	"slices"
-	"extrovert/internals"
 	"fmt"
 	"errors"
 )
@@ -87,7 +86,7 @@ func getInstanceList(limit int) []Instance {
 		log.Printf("WARN: Unable to fetch Mastodon instance datalist due to:\n%s\n\nFall backing into static list.", err.Error())
 		return INSTANCES
 	}
-	return internals.RemoveDuplicates(slices.Concat(INSTANCES, i))
+	return slices.Concat(INSTANCES, i)
 }
 
 templ InstancesOptions(limit int) {

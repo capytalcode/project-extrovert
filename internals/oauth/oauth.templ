@@ -1,0 +1,169 @@
+package oauth
+
+import (
+	"encoding/json"
+	e "errors"
+	"net/http"
+	"net/url"
+	"strings"
+	"fmt"
+
+	"extrovert/internals/router/errors"
+	"extrovert/templates/pages"
+)
+
+type OAuthClient interface {
+	ServeHTTP(w http.ResponseWriter, r *http.Request)
+	Token(r *http.Request) (string, error)
+	LoginButton() templ.Component
+}
+
+type DefaultOAuthToken struct {
+	Type         string  `json:"token_type"`
+	Token        string  `json:"access_token"`
+	Expires      int     `json:"expires_in"`
+	Scope        string  `json:"scope"`
+	RefreshToken *string `json:"refresh_token"`
+}
+
+type DefaultOAuthClient struct {
+	Name          string
+	Id            string
+	Secret        string
+	AuthEndpoint  *url.URL
+	TokenEndpoint *url.URL
+	RedirectUri   *url.URL
+}
+
+func NewDefaultOAuthClient(u *url.URL, id string, secret string, redirect *url.URL) DefaultOAuthClient {
+	auth, _ := url.Parse(u.String())
+
+	q := auth.Query()
+	q.Add("client_id", id)
+	q.Add("redirect_uri", redirect.String())
+	q.Add("response_type", "code")
+	q.Add("scope", "read write")
+	q.Add("state", "state")
+	q.Add("code_challenge", "challenge")
+	q.Add("code_challenge_method", "plain")
+	auth.RawQuery = q.Encode()
+
+	auth = auth.JoinPath("/oauth2/authorize")
+
+	token, _ := url.Parse(u.String())
+	token = token.JoinPath("/oauth2/token")
+
+	return DefaultOAuthClient{
+		Name:          u.Hostname(),
+		Id:            id,
+		Secret:        secret,
+		AuthEndpoint:  auth,
+		TokenEndpoint: token,
+		RedirectUri:   redirect,
+	}
+}
+
+templ (c DefaultOAuthClient) LoginButton() {
+	<a
+		role="button"
+		href={ templ.SafeURL(c.AuthEndpoint.String()) }
+		rel="noopener noreferrer nofollow"
+	>
+		Login on { c.Name }
+	</a>
+}
+
+func (c DefaultOAuthClient) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	code := r.URL.Query().Get("code")
+	if code == "" {
+		errors.NewErrMissingParams("code").ServeHTTP(w, r)
+		return
+	}
+
+	req := c.TokenEndpoint
+
+	q := req.Query()
+	q.Add("client_id", c.Id)
+	q.Add("client_secret", c.Secret)
+	q.Add("code", code)
+	q.Add("redirect_uri", c.RedirectUri.String())
+	q.Add("grant_type", "authorization_code")
+	q.Add("code_verifier", "challenge")
+	q.Add("challenge_method", "plain")
+	req.RawQuery = q.Encode()
+
+	res, err := http.Post(req.String(), "application/x-www-form-urlencoded", bytes.NewReader([]byte("")))
+	if err != nil {
+		errors.NewErrInternal(e.New("Error while trying to request token"), err).ServeHTTP(w, r)
+		return
+	}
+
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		errors.NewErrInternal(e.New("Error while trying to read token response body"), err).ServeHTTP(w, r)
+		return
+	}
+	if res.StatusCode != 200 {
+		errors.NewErrInternal(fmt.Errorf(
+			"Unable to retrieve token, non-200 response from platform. \nStatus: %v\nBody: %s",
+			res.StatusCode, string(body)),
+		).ServeHTTP(w, r)
+		return
+	}
+
+	var token DefaultOAuthToken
+	err = json.Unmarshal(body, &token)
+	if err != nil {
+		errors.NewErrInternal(e.New("Error while trying to validate token response body"), err).ServeHTTP(w, r)
+		return
+	}
+
+	cv, err := json.Marshal(token)
+	if err != nil {
+		errors.NewErrInternal(e.New("Error while trying to validate token response body"), err).ServeHTTP(w, r)
+		return
+	}
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "__Host-OAUTH-" + strings.ToUpper(c.Name),
+		Value:    url.PathEscape(string(cv)),
+		SameSite: http.SameSiteStrictMode,
+		Path:     "/",
+		Secure:   true,
+		HttpOnly: true,
+	})
+
+	err = pages.RedirectPopUp(
+		"Logged into "+c.Name+"!",
+		"Your "+c.Name+" account was successfully logged into project-extrovert. "+
+			"Click the button below to return to the Homepage.",
+		templ.SafeURL("/"),
+	).Render(r.Context(), w)
+
+	if err != nil {
+		errors.NewErrInternal(e.New("Unable to render redirect page"), err).ServeHTTP(w, r)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func (c DefaultOAuthClient) Token(r *http.Request) (string, error) {
+	cookie, err := r.Cookie("__Host-OAUTH-" + strings.ToUpper(c.Name))
+	if err != nil {
+		return "", e.Join(e.New("Unable get token cookie"), err)
+	}
+
+	j, err := url.PathUnescape(cookie.Value)
+	if err != nil {
+		return "", e.Join(e.New("Unable to unescape token json"), err)
+	}
+
+	var token DefaultOAuthToken
+	err = json.Unmarshal([]byte(j), &token)
+	if err != nil {
+		return "", e.Join(e.New("Unable to parse token json"), err)
+	}
+
+	return token.Token, nil
+}

@@ -1,20 +1,26 @@
 package routes
 
 import (
-	"net/http"
-
-	"extrovert/layouts"
+	"extrovert/templates/layouts"
 	"extrovert/components"
-	"extrovert/internals"
+	"extrovert/internals/app"
+	"net/http"
+	"extrovert/internals/router/errors"
+	e "errors"
 )
 
-func IndexHandler(w http.ResponseWriter, r *http.Request) {
-	_ = internals.GetCookie("twitter-data", w, r)
+type Homepage struct{}
 
-	IndexPage().Render(context.TODO(), w)
+func (h Homepage) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusOK)
+
+	err := h.page().Render(context.Background(), w)
+	if err != nil {
+		errors.NewErrInternal(e.New("Unable to render dashboard"), err).ServeHTTP(w, r)
+	}
 }
 
-templ IndexPage() {
+templ (h Homepage) page() {
 	@layouts.Page("Project Extrovert") {
 		<div style="max-width:50rem;">
 			<div style="display:flex;flex-direction:column;gap:1rem;">
@@ -25,8 +31,8 @@ templ IndexPage() {
 						style="height:100%;display:flex;gap:2rem;"
 					>
 						<div style="display:flex;flex-direction:column;gap:1rem;width:15rem;">
-							@components.LoginTwitter()
-							@components.LoginMastodon()
+							@app.TWITTER_APP.LoginButton()
+							@app.MASTODON_APP.LoginButton()
 						</div>
 						<fieldset>
 							<textarea

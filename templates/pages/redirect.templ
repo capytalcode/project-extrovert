@@ -1,0 +1,26 @@
+package pages
+
+import (
+	"extrovert/templates/layouts"
+)
+
+templ RedirectPopUp(title string, msg string, url templ.SafeURL) {
+	@layouts.Page("Project Extrovert") {
+		<dialog open>
+			<article>
+				<header>
+					<p>{ title }</p>
+				</header>
+				<p>
+					{ msg }
+				</p>
+				<footer>
+					<a href={ url }>
+						<button>Ok</button>
+					</a>
+				</footer>
+			</article>
+		</dialog>
+		{ children... }
+	}
+}

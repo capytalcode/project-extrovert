@@ -15,7 +15,7 @@ var loginUrl = fmt.Sprintf("https://x.com/i/oauth2/authorize"+
 	"&code_challenge=challenge"+
 	"&code_challenge_method=plain",
 	os.Getenv("TWITTER_CLIENT_ID"),
-	url.PathEscape("http://localhost:7331/api/oauth/twitter"),
+	url.PathEscape("http://localhost:7331/api/twitter/oauth"),
 )
 
 templ LoginTwitter() {
@@ -36,16 +36,27 @@ templ LoginMastodon() {
 					></button>
 					<label for="instance-url">Choose a instance</label>
 				</header>
-				<input
-					type="url"
-					name="instance-url"
-					placeholder="Instance Url"
-					aria-label="Instance Url"
-					list="instance-suggestions"
-				/>
-				<datalist id="instance-suggestions">
-					@InstancesOptions(20)
-				</datalist>
+				<form
+					autocomplete="on"
+					method="post"
+					action="/api/mastodon/apps"
+					enctype="application/x-www-form-urlencoded"
+				>
+					<fieldset role="group">
+						<input
+							type="url"
+							name="instance-url"
+							placeholder="https://mastodon.social"
+							aria-label="Instance Url"
+							list="instance-suggestions"
+							required
+						/>
+						<datalist id="instance-suggestions">
+							@InstancesOptions(20)
+						</datalist>
+						<button>Login</button>
+					</fieldset>
+				</form>
 			</article>
 		</dialog>
 	</div>
