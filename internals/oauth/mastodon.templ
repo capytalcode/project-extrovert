@@ -1,165 +1,129 @@
 package oauth
 
 import (
+	"encoding/json"
+	e "errors"
+	"fmt"
 	"net/http"
+	"net/url"
+	"strings"
 
 	"extrovert/components"
-	"net/url"
-	e "errors"
 	"extrovert/internals/router/errors"
-	"math/rand"
-	"fmt"
-	"math"
-	"encoding/json"
-	"slices"
-	"strings"
 	"extrovert/templates/pages"
 )
 
-const MASTODON_COOKIE_PREFIX = "__Host-OAUTH-MASTODON-APP-"
-
 type MastodonOAuthClient struct {
-	AuthEndpoint  *url.URL
-	RedirectUri   *url.URL
-	TokenEndpoint *url.URL
+	Name        string
+	Id          *string
+	Secret      *string
+	RedirectUri *url.URL
 }
 
-type MastodonOAuthApplication struct {
-	InstanceUrl  string `json:"instance_url"`
-	ClientId     string `json:"client_id"`
-	ClientSecret string `json:"client_secret"`
+const MASTODON_TOKEN_COOKIE_NAME = "OAUTH-MASTODON"
+
+type MastodonOAuthToken struct {
+	InstanceUrl string `json:"instance_url"`
+	Type        string `json:"token_type"`
+	Token       string `json:"access_token"`
+	Scope       string `json:"scope"`
+	CreatedAt   int    `json:"created_at"`
 }
 
-func NewMastodonOAuthClient(redirect *url.URL) MastodonOAuthClient {
-	auth, _ := url.Parse("https://mastodon.social/oauth/authorize")
-	qa := auth.Query()
-	qa.Set("redirect_uri", redirect.String())
-	qa.Set("response_type", "code")
-	qa.Set("scope", "read write")
-	auth.RawQuery = qa.Encode()
-
-	token, _ := url.Parse("https://mastodon.social/oauth/token")
-
-	return MastodonOAuthClient{
-		AuthEndpoint:  auth,
-		RedirectUri:   redirect,
-		TokenEndpoint: token,
+func NewMastodonOAuthClient(redirect *url.URL) *MastodonOAuthClient {
+	return &MastodonOAuthClient{
+		Name:        "project-extrovert-oauth-client",
+		RedirectUri: redirect,
 	}
 }
 
-func (c MastodonOAuthClient) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if r.Method == http.MethodPost {
-		c.CreateApplication(w, r)
-		return
-	} else if r.Method != http.MethodGet && r.Method != http.MethodHead {
-		errors.
-			NewErrMethodNotAllowed(r.Method, http.MethodGet, http.MethodPost, http.MethodHead).
-			ServeHTTP(w, r)
+func (c *MastodonOAuthClient) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		errors.NewErrMethodNotAllowed("GET", "HEAD").ServeHTTP(w, r)
 		return
 	}
 
-	o := r.URL.Query().Get("instance-url")
-	if o == "" {
+	i := r.FormValue("instance-url")
+	if i == "" {
 		errors.NewErrMissingParams("instance-url").ServeHTTP(w, r)
 		return
 	}
 
-	i, err := url.Parse(o)
+	iu, err := url.Parse(i)
 	if err != nil {
 		errors.
-			NewErrBadRequest("Unable to parse \"instance-url\" due to: %s", err.Error()).
-			ServeHTTP(w, r)
-		return
-	}
-
-	if r.URL.Query().Get("step") == "1" {
-		q := c.RedirectUri.Query()
-		q.Set("instance-url", i.String())
-		q.Set("step", "2")
-		q.Set("code", r.URL.Query().Get("code"))
-		c.RedirectUri.RawQuery = q.Encode()
-
-		err := pages.RedirectPopUp(
-			"Mastodon "+i.Hostname()+" sent the code to connect your account.",
-			"Click the button bellow to continue the login procress.",
-			templ.SafeURL(c.RedirectUri.String()),
-		).Render(r.Context(), w)
-
-		if err != nil {
-			errors.NewErrInternal(e.New("Unable to render redirect page"), err).ServeHTTP(w, r)
-			return
-		}
-
-		w.WriteHeader(http.StatusOK)
-		return
-	}
-
-	a, err := getInstanceApplication(i, r)
-	if err != nil {
-		errors.
-			NewErrInternal(fmt.Errorf("Unable to find an application to this instance %s", i.Hostname()), err).
-			ServeHTTP(w, r)
-		return
-	}
-	c.TokenEndpoint.Host = i.Host
-
-	ac := NewDefaultOAuthClient(i, a.ClientId, a.ClientSecret, c.RedirectUri)
-	ac.Name = "MASTODON-" + strings.ToUpper(i.Hostname())
-	ac.AuthEndpoint.Path = c.AuthEndpoint.Path
-	ac.TokenEndpoint.Path = c.TokenEndpoint.Path
-	ac.AuthEndpoint.Host = i.Host
-	ac.TokenEndpoint.Host = i.Host
-
-	q := ac.RedirectUri.Query()
-	q.Del("code")
-	q.Set("instance-url", i.Hostname())
-	q.Set("step", "1")
-	ac.RedirectUri.RawQuery = q.Encode()
-
-	ac.ServeHTTP(w, r)
-	return
-}
-
-func (c MastodonOAuthClient) CreateApplication(w http.ResponseWriter, r *http.Request) {
-	err := r.ParseForm()
-	if err != nil {
-		errors.NewErrBadRequest("Unable to parse form parameters.").ServeHTTP(w, r)
-		return
-	}
-
-	iu := r.PostForm.Get("instance-url")
-	if iu == "" {
-		errors.NewErrMissingParams("instance-url").ServeHTTP(w, r)
-		return
-	}
-
-	i, err := url.Parse(iu)
-	if err != nil {
-		errors.
-			NewErrBadRequest("Unable to parse \"instance-url\" due to %s", err.Error()).
+			NewErrBadRequest("\"instance-url\" is not a valid URL. Failed to parse due to %s", err.Error()).
 			ServeHTTP(w, r)
 		return
 	}
 
 	q := c.RedirectUri.Query()
-	q.Set("instance-url", i.String())
-	q.Set("step", "1")
+	q.Del("code")
+	q.Set("instance-url", iu.String())
 	c.RedirectUri.RawQuery = q.Encode()
 
-	a, err := getInstanceApplication(i, r)
-	if err == nil {
-		i.Path = c.AuthEndpoint.Path
-		i.RawQuery = c.AuthEndpoint.RawQuery
-		q := i.Query()
+	code := r.FormValue("code")
+
+	a := NewMastodonOAuthApp(iu)
+	if err := a.PopulateWithRequestCookies(r); err != nil {
+		// This step is necessary since after the user has been redirected back from Mastodon's
+		// authorization endpoint, the browser will not send cookies. Adding this redirect step
+		// forces it to make another request and send the cookies for the PopulateWithRequestCookies
+		// function.
+		if code != "" {
+			q = c.RedirectUri.Query()
+			q.Set("code", code)
+			c.RedirectUri.RawQuery = q.Encode()
+
+			err = pages.RedirectPopUp(
+				iu.Hostname()+" returned the OAuth code!",
+				"The Mastodon instance "+iu.Hostname()+" returned the authorization code. "+
+					"Click the button bellow to continue the log in process.",
+				templ.SafeURL(c.RedirectUri.String()),
+			).Render(r.Context(), w)
+
+			if err != nil {
+				errors.NewErrInternal(e.New("Unable to render redirect page"), err).ServeHTTP(w, r)
+				return
+			}
+
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		err = a.PopulateWithInstance(c.Name, c.RedirectUri)
+		if err != nil {
+			errors.
+				NewErrInternal(e.New("Unable to create application"), err).
+				ServeHTTP(w, r)
+			return
+		}
+
+		ck, err := a.ToCookie()
+		if err != nil {
+			errors.
+				NewErrInternal(e.New("Unable to make application cookie"), err).
+				ServeHTTP(w, r)
+			return
+		}
+
+		iu.Path = "/oauth/authorize"
+		q = iu.Query()
 		q.Set("client_id", a.ClientId)
 		q.Set("redirect_uri", c.RedirectUri.String())
-		i.RawQuery = q.Encode()
+		q.Set("response_type", "code")
+		q.Set("scope", "read write")
+		q.Set("state", "state")
+		q.Set("code_challenge", "challenge")
+		q.Set("code_challenge_method", "plain")
+		iu.RawQuery = q.Encode()
 
+		http.SetCookie(w, ck)
 		err = pages.RedirectPopUp(
-			"Mastodon application already created!",
-			"A OAuth application on "+i.Hostname()+" to connect your account into is already created. "+
-				"Click the button below to connect your account",
-			templ.SafeURL(i.String()),
+			"Create application to use in "+iu.Hostname()+"!",
+			"An OAuth application was created in "+iu.Hostname()+" for you to use. "+
+				"Click the button bellow to continue the log in process.",
+			templ.SafeURL(iu.String()),
 		).Render(r.Context(), w)
 
 		if err != nil {
@@ -171,81 +135,78 @@ func (c MastodonOAuthClient) CreateApplication(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	i.Path = "/api/v1/apps"
-	q = i.Query()
-	q.Set("client_name", fmt.Sprintf("project-extrovert-%v", math.Round(rand.Float64()*1000)))
-	q.Set("redirect_uris", c.RedirectUri.String())
-	q.Set("scopes", "read write")
-	i.RawQuery = q.Encode()
-
-	req, err := http.Post(i.String(), "application/x-www-form-urlencoded", bytes.NewBuffer([]byte("")))
-	if err != nil {
-		errors.NewErrInternal(
-			fmt.Errorf("Unable to create application to instance %s", i.Hostname()),
-			err,
-		).ServeHTTP(w, r)
+	if code == "" {
+		errors.NewErrMissingParams("code").ServeHTTP(w, r)
 		return
 	}
 
-	body, err := io.ReadAll(req.Body)
-	if err != nil {
-		errors.NewErrInternal(
-			fmt.Errorf("Unable to read response body from instance %s", i.Hostname()),
-			err,
-		).ServeHTTP(w, r)
-		return
+	iu.Path = "/oauth/token"
+	q = iu.Query()
+	q.Set("client_id", a.ClientId)
+	q.Set("client_secret", a.ClientSecret)
+	q.Set("code", code)
+	q.Set("redirect_uri", c.RedirectUri.String())
+	q.Set("scope", "read write")
+	q.Set("grant_type", "authorization_code")
+	q.Set("code_verifier", "challenge")
+	q.Set("challenge_method", "plain")
+	iu.RawQuery = q.Encode()
 
-	} else if req.StatusCode != http.StatusOK {
+	res, err := http.Post(iu.String(), "application/x-www-form-urlencoded", bytes.NewBuffer([]byte("")))
+	if err != nil {
+		errors.NewErrInternal(e.New("Error while trying to request token"), err).ServeHTTP(w, r)
+		return
+	}
+
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		errors.
+			NewErrInternal(e.New("Error while trying to read token response body"), err).
+			ServeHTTP(w, r)
+		return
+	}
+	if res.StatusCode != 200 {
 		errors.NewErrInternal(fmt.Errorf(
-			"Instance %s returned a non-200 code %v. Returned body: %s",
-			i.Hostname(), req.StatusCode, body,
-		)).ServeHTTP(w, r)
-		return
-	}
-
-	err = json.Unmarshal(body, &a)
-	if err != nil {
-		errors.NewErrInternal(
-			fmt.Errorf("Unable to parse response from %s", i.Hostname()),
-			err,
+			"Unable to retrieve token, non-200 response from platform. \nStatus: %v\nBody: %s",
+			res.StatusCode, string(body)),
 		).ServeHTTP(w, r)
 		return
 	}
 
-	i.Path = ""
-	i.RawQuery = ""
-	a.InstanceUrl = i.String()
-
-	v, err := json.Marshal(a)
+	var t MastodonOAuthToken
+	err = json.Unmarshal(body, &t)
 	if err != nil {
-		errors.NewErrInternal(
-			fmt.Errorf("Unable to marshal MastodonOAuthApplication json for instance %s", i.Hostname()),
-			err,
-		).ServeHTTP(w, r)
+		errors.
+			NewErrInternal(e.New("Error while trying to validate token response body"), err).
+			ServeHTTP(w, r)
+		return
+	}
+	iu.Path = ""
+	iu.RawQuery = ""
+	t.InstanceUrl = iu.String()
+
+	cv, err := json.Marshal(t)
+	if err != nil {
+		errors.
+			NewErrInternal(e.New("Error while trying to validate token response body"), err).
+			ServeHTTP(w, r)
 		return
 	}
 
 	http.SetCookie(w, &http.Cookie{
-		Name:     MASTODON_COOKIE_PREFIX + strings.ToUpper(i.Hostname()),
-		Value:    url.PathEscape(string(v)),
+		Name:     "__Host-" + MASTODON_TOKEN_COOKIE_NAME,
+		Value:    url.PathEscape(string(cv)),
 		SameSite: http.SameSiteStrictMode,
 		Path:     "/",
 		Secure:   true,
 		HttpOnly: true,
 	})
 
-	i.Path = c.AuthEndpoint.Path
-	i.RawQuery = c.AuthEndpoint.RawQuery
-	q = i.Query()
-	q.Set("client_id", a.ClientId)
-	q.Set("redirect_uri", c.RedirectUri.String())
-	i.RawQuery = q.Encode()
-
 	err = pages.RedirectPopUp(
-		"Mastodon application created!",
-		"A OAuth application on "+i.Hostname()+" to connect your account into was created. "+
-			"Click the button below to connect your account",
-		templ.SafeURL(i.String()),
+		"Logged into "+iu.Hostname()+"!",
+		"Your "+iu.Hostname()+" account was successfully logged into project-extrovert. "+
+			"Click the button below to return to the Homepage.",
+		templ.SafeURL("/"),
 	).Render(r.Context(), w)
 
 	if err != nil {
@@ -256,62 +217,106 @@ func (c MastodonOAuthClient) CreateApplication(w http.ResponseWriter, r *http.Re
 	w.WriteHeader(http.StatusOK)
 }
 
-func (c MastodonOAuthClient) GetToken(w http.ResponseWriter, r *http.Request) {
-
+type MastodonOAuthApp struct {
+	InstanceUrl  string `json:"instance_url"`
+	ClientId     string `json:"client_id"`
+	ClientSecret string `json:"client_secret"`
 }
 
-func getInstanceApplication(i *url.URL, r *http.Request) (MastodonOAuthApplication, error) {
-	ci := slices.IndexFunc(r.Cookies(), func(c *http.Cookie) bool {
-		b, _ := isInstanceCookie(i, c)
-		return b
-	})
-	if ci == -1 {
-		return MastodonOAuthApplication{}, http.ErrNoCookie
-	}
-
-	c := r.Cookies()[ci]
-	v, err := url.PathUnescape(c.Value)
-	if err != nil {
-		return MastodonOAuthApplication{}, err
-	}
-	fmt.Printf("%v", v)
-
-	var a MastodonOAuthApplication
-	err = json.Unmarshal([]byte(v), &a)
-	if err != nil {
-		return MastodonOAuthApplication{}, err
-	}
-
-	return a, nil
+func NewMastodonOAuthApp(instance *url.URL) MastodonOAuthApp {
+	return MastodonOAuthApp{InstanceUrl: instance.String()}
 }
 
-func isInstanceCookie(i *url.URL, c *http.Cookie) (bool, error) {
-	if !strings.HasPrefix(c.Name, MASTODON_COOKIE_PREFIX) {
-		return false, nil
+func (a *MastodonOAuthApp) PopulateWithInstance(name string, redirect *url.URL) error {
+	i, err := url.Parse(a.InstanceUrl)
+	if err != nil {
+		return err
 	}
 
-	iCookieName := MASTODON_COOKIE_PREFIX + strings.ToUpper(i.Hostname())
-	if iCookieName == c.Name {
-		return true, nil
+	i.Path = "/api/v1/apps"
+	q := i.Query()
+	q.Set("client_name", name)
+	q.Set("redirect_uris", redirect.String())
+	q.Set("scopes", "read write")
+	i.RawQuery = q.Encode()
+
+	req, err := http.Post(i.String(), "application/x-www-form-urlencoded", bytes.NewBuffer([]byte("")))
+	if err != nil {
+		return err
+	}
+
+	body, err := io.ReadAll(req.Body)
+	if err != nil {
+		return err
+	} else if req.StatusCode != http.StatusOK {
+		return fmt.Errorf(
+			"Unable to create application, instance %s returned a non-200 status code.\nStatus: %v\nBody: %s",
+			i.Hostname(), req.StatusCode, string(body),
+		)
+	}
+
+	var ra MastodonOAuthApp
+	err = json.Unmarshal(body, &ra)
+	if err != nil {
+		return err
+	}
+
+	a.ClientId = ra.ClientId
+	a.ClientSecret = ra.ClientSecret
+	return nil
+}
+
+func (a *MastodonOAuthApp) PopulateWithRequestCookies(r *http.Request) error {
+	n := a.CookieName()
+	c, err := r.Cookie(n)
+	if err != nil {
+		return e.Join(
+			fmt.Errorf("Unable to find application cookie for instance %s", a.InstanceUrl),
+			err,
+		)
 	}
 
 	v, err := url.PathUnescape(c.Value)
 	if err != nil {
-		return false, e.New("Unable to unescape Mastodon cookie value")
+		return e.Join(
+			fmt.Errorf("Unable to unescape application cookie %s, value %v", n, c.Value),
+			err,
+		)
 	}
 
-	var a MastodonOAuthApplication
-	err = json.Unmarshal([]byte(v), &a)
+	var ca MastodonOAuthApp
+	err = json.Unmarshal([]byte(v), &ca)
 	if err != nil {
-		return false, e.New("Unable to parse Mastodon cookie value")
+		return e.Join(
+			fmt.Errorf("Unable to unmarshal application cookie %s, value %v", n, v),
+			err,
+		)
 	}
 
-	u, err := url.Parse(a.InstanceUrl)
+	a.ClientId = ca.ClientId
+	a.ClientSecret = ca.ClientSecret
+	return nil
+}
+
+func (a *MastodonOAuthApp) CookieName() string {
+	u, _ := url.Parse(a.InstanceUrl)
+	return "__Host-APP-MASTODON-" + strings.ToUpper(u.Hostname())
+}
+
+func (a *MastodonOAuthApp) ToCookie() (*http.Cookie, error) {
+	v, err := json.Marshal(a)
 	if err != nil {
-		return false, e.New("Unable to parse Mastodon cookie instance URL")
+		return &http.Cookie{}, err
 	}
 
-	return u.Hostname() == i.Hostname(), nil
+	return &http.Cookie{
+		Name:     a.CookieName(),
+		Value:    url.PathEscape(string(v)),
+		SameSite: http.SameSiteStrictMode,
+		Path:     "/",
+		Secure:   true,
+		HttpOnly: true,
+	}, nil
 }
 
 templ (c MastodonOAuthClient) LoginButton() {
@@ -330,7 +335,6 @@ templ (c MastodonOAuthClient) LoginButton() {
 				</header>
 				<form
 					autocomplete="on"
-					method="post"
 					action={ templ.SafeURL(c.RedirectUri.String()) }
 					enctype="application/x-www-form-urlencoded"
 				>

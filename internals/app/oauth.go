@@ -25,7 +25,7 @@ var TWITTER_APP = func() oauth.TwitterOAuth {
 
 const MASTODON_REDIRECT = "/api/mastodon/oauth2"
 
-var MASTODON_APP = func() oauth.MastodonOAuthClient {
+var MASTODON_APP = func() *oauth.MastodonOAuthClient {
 	ru, _ := url.Parse(DOMAIN)
 	ru = ru.JoinPath(MASTODON_REDIRECT)
 
